@@ -178,8 +178,8 @@ for col, ti in enumerate(t_snapshots):
     ax.set_xlabel("x"); ax.set_ylabel("y")
 
 plt.tight_layout()
-plt.savefig("outputs/day3_result.png", dpi=150, bbox_inches='tight')
-print("plot saved to outputs/day3_result.png")
+plt.savefig("outputs/heat_2d_result.png", dpi=150, bbox_inches='tight')
+print("plot saved to outputs/heat_2d_result.png")
 
 # accuracy at several times (rel L2 vs exact solution)
 xf = torch.tensor(X2d.flatten(), dtype=torch.float32).unsqueeze(1)
