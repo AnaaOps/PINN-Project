@@ -16,8 +16,8 @@ The project has three parts:
 | 2D heat | PINN | 0.90% at t=0, 1.12% at t=1 (8000 epochs) |
 | Burgers | PINN, Adam 10k epochs | 5.70% (max abs error 0.605) |
 | Burgers | Same network, no physics (IC/BC data only) | 48.63% |
-| Burgers | Adam 5k epochs only | ~32% (seed 42) |
-| Burgers | Adam 5k + L-BFGS | ~0.5% (seed 42) |
+| Burgers | Adam 5k epochs only | 32.23% (seed 42) |
+| Burgers | Adam 5k + L-BFGS | 0.49% (seed 42, max abs error 0.055) |
 
 The exact solutions are the analytical solution for the heat equations and the Cole-Hopf solution for Burgers (`utils/burgers_reference.py`).
 
@@ -25,15 +25,15 @@ The exact solutions are the analytical solution for the heat equations and the C
 
 ### L-BFGS fine-tuning (Burgers)
 
-Adam alone stalls at about 32% error. Switching to L-BFGS on a fixed set of collocation points brought it down to about 0.5% on seed 42.
+Adam alone stalls at about 32% error. Switching to L-BFGS on a fixed set of collocation points brought it down to 0.49% on seed 42.
 
 | Seed | Adam only | Adam + L-BFGS |
 |---|---|---|
-| 42 | TODO | TODO |
+| 42 | 32.23% | 0.49% |
 | 1 | TODO | TODO |
 | 2 | TODO | TODO |
 
-I also tried putting half the collocation points near the shock (`--refine`). In my run this made things worse (3.36% vs about 0.5%, seed 42). I only ran it once, so I can't say why.
+I also tried putting half the collocation points near the shock (`--refine`). In my run this made things worse (3.36% vs 0.49%, seed 42). I only ran it once, so I can't say why.
 
 ### FNO vs PINO (Burgers, periodic, nu = 0.01)
 
@@ -41,22 +41,23 @@ Both models learn the map from an initial condition u(x,0) to the solution u(x,1
 
 | Labeled samples | FNO | PINO (weight 0.1, filtered) |
 |---|---|---|
-| 1000 | 4.38% | TODO |
-| 50 | 49.84%, 49.87%, 53.72% (3 seeds) | TODO seed 0, 36.99%, 37.57% |
+| 1000 | 4.38% | 11.29% (weight 0.1), 6.90% (weight 0.001) |
+| 50 | 49.84%, 49.87%, 53.72% (mean 51.1%) | 39.76%, 36.99%, 37.57% (mean 38.1%) |
 
-The physics loss helps a lot when labels are scarce. The first PINO version (no filtering, weight 0.01) was worse than the plain FNO with all 1000 labels (7.54% vs 4.38%).
+With only 50 labels the physics loss lowers the error by about 13 points on average (3 seeds each). With all 1000 labels it never helped: 11.29% at weight 0.1, 7.54% at weight 0.01 (without the filter) and 6.90% at weight 0.001, against 4.38% for the plain FNO. The error gets closer to the FNO as the weight shrinks, which suggests the physics term only gets in the way when there is plenty of labeled data. Those 1000-label runs are single seeds, and they mix filtered and unfiltered settings.
 
 ## What I learned and what went wrong
 
 - **Boundary sampler bug.** In the 2D heat script, boundary points were sampled three times per epoch with mismatched times. I fixed it to sample once.
 - **The shock is hard.** In Burgers the error concentrates in a thin line at x=0 and grows with time (3.6% at t=0.25, 11.4% at t=1.0).
 - **No-physics baseline.** The same network trained only on initial and boundary data fits them (loss 0.001) but has 48.6% error inside the domain, which is the point of adding the PDE loss.
-- **PINO needed a filter.** My guess is that the spectral derivative amplifies high-frequency noise in the network output (by up to about k^2). Filtering with the same 2/3 rule the solver uses brought the 50-label error down further. I didn't prove that this is the cause.
+- **Filtering the physics loss.** The spectral derivative multiplies each Fourier mode by k^2, so I guessed that high-frequency noise in the network output was inflating the residual, and added the same 2/3 low-pass filter the solver uses. On seed 0 at weight 0.1 it lowered the 50-label error from 42.46% to 39.76%. That is one seed and a small gain, so I can't say the filter matters or that my explanation is right.
+- **Physics loss hurts with plenty of data.** At 1000 labels the PINO did worse than the FNO for every weight I tried (0.1, 0.01, 0.001), and the filter didn't fix it. At weight 0.1 the data fit got worse (train data loss 0.10 vs 0.026), so I think the physics term competes with the data term.
 - **FNO viscosity.** My first dataset used nu = 0.1, but everything had decayed to nearly zero by t=1, which made the problem trivial. I switched to nu = 0.01.
 
 ## Limitations
 
-- Seeds: 3 seeds for the FNO/PINO experiments and L-BFGS, 1 for everything else. These are small samples.
+- Seeds: 3 seeds for FNO/PINO at 50 labels and for L-BFGS; 1 seed for FNO/PINO at 1000 labels and everything else. These are small samples, and all runs use the same 200 test samples.
 - I picked the PINO weight (0.1) by looking at test error, so that number is slightly optimistic.
 - PINO is slower per epoch than the FNO because of the extra forward passes for the time derivative.
 - Even with the physics loss, the PINO residual stays around 1, so it doesn't fully satisfy the PDE.
@@ -89,7 +90,3 @@ FNO_train.py         FNO and PINO training
 utils/               exact Burgers solution (Cole-Hopf)
 outputs/             plots and fno_results.csv
 ```
-
-## Tools
-
-I used Claude (an AI assistant) to help write and debug code. I ran every experiment myself, and all numbers above come from my own runs.
