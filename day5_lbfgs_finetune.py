@@ -24,13 +24,14 @@ parser.add_argument('--refine', action='store_true',
                     help='put half of the collocation points near the shock (|x|<0.2)')
 parser.add_argument('--adam-epochs', type=int, default=5000)
 parser.add_argument('--lbfgs-iters', type=int, default=1500)
+parser.add_argument('--seed', type=int, default=42)
 args = parser.parse_args()
 
 os.makedirs('outputs', exist_ok=True)
-torch.manual_seed(42)
-np.random.seed(42)
+torch.manual_seed(args.seed)
+np.random.seed(args.seed)
 NU = 0.01 / np.pi
-TAG = 'refine' if args.refine else 'uniform'
+TAG = ('refine' if args.refine else 'uniform') + f'_seed{args.seed}'
 
 
 class BurgersPINN(nn.Module):
@@ -142,7 +143,7 @@ def closure():
 lbfgs.step(closure)
 U_lb, err_lb = evaluate(model, 'after L-BFGS')
 
-print(f"\nsummary ({TAG} points): Adam {err_adam*100:.2f}%  ->  Adam + L-BFGS {err_lb*100:.2f}%")
+print(f"\nsummary ({TAG}): Adam {err_adam*100:.2f}%  ->  Adam + L-BFGS {err_lb*100:.2f}%")
 
 # ---- plot ------------------------------------------------------------
 fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
