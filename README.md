@@ -1,121 +1,95 @@
-# Physics-Informed Neural Networks (PINNs)
+# PINN-Project: physics-informed learning for heat and Burgers equations
 
-Solving real-world PDEs with neural networks that learn from physics equations — not just data.
+I built this to learn how neural networks can solve PDEs, starting from autograd basics and ending with operator learning. Everything runs on a laptop CPU in PyTorch.
 
-![Day 2 Result](outputs/day2_result.png)
+The project has three parts:
 
----
-
-## What this is
-
-Most neural networks need thousands of labeled examples to learn. PINNs are different — they learn by enforcing **physics equations** (PDEs) directly inside the loss function. The result: accurate predictions from boundary and initial conditions alone, with zero labeled training data.
-
-This project solves three classic PDEs of increasing difficulty:
-
-| File | Equation | Domain | Difficulty |
-|---|---|---|---|
-| `day2_1d_heat_pinn.py` | `du/dt = α ∂²u/∂x²` | 1D + time | Baseline |
-| `day3_2d_heat_pinn.py` | `du/dt = α (∂²u/∂x² + ∂²u/∂y²)` | 2D + time | Medium |
-| `day4_burgers_pinn.py` | `du/dt + u∂u/∂x = ν ∂²u/∂x²` | 1D + time | Hard (nonlinear) |
-
----
-
-## How it works
-
-A standard neural network minimizes only data loss. A PINN minimizes:
-
-```
-Total Loss = PDE Residual Loss + Boundary Condition Loss + Initial Condition Loss
-```
-
-The PDE residual is computed using `torch.autograd.grad` — PyTorch automatically differentiates the network output with respect to its inputs (x, t), giving us ∂u/∂t, ∂u/∂x, ∂²u/∂x² on demand. If the network satisfies the PDE, the residual is zero.
-
-```python
-# core mechanic - gradient of output w.r.t. input (not weights)
-u = model(x, t)
-du_dt   = torch.autograd.grad(u, t, torch.ones_like(u), create_graph=True)[0]
-du_dx   = torch.autograd.grad(u, x, torch.ones_like(u), create_graph=True)[0]
-d2u_dx2 = torch.autograd.grad(du_dx, x, torch.ones_like(du_dx), create_graph=True)[0]
-
-residual = du_dt - alpha * d2u_dx2  # heat equation — push this to 0
-```
-
----
+1. **PINNs** for the 1D heat, 2D heat and Burgers equations
+2. **L-BFGS fine-tuning**, which fixed most of the error on Burgers
+3. **FNO and PINO** (Fourier neural operators), compared on how few labeled samples they need
 
 ## Results
 
-### Day 2 — 1D Heat Equation
-- **0.617% relative L2 error** vs analytical solution `u(x,t) = exp(-α π² t) sin(πx)`
-- Max absolute error: 0.009
-- 5000 epochs, Adam lr=1e-3, zero training data
+| Problem | Method | Relative L2 error vs exact |
+|---|---|---|
+| 1D heat | PINN | TODO (paste exact value from `1d_heat_pinn.py`) |
+| 2D heat | PINN | 0.90% at t=0, 1.12% at t=1 (8000 epochs) |
+| Burgers | PINN, Adam 10k epochs | 5.70% (max abs error 0.605) |
+| Burgers | Same network, no physics (IC/BC data only) | 48.63% |
+| Burgers | Adam 5k epochs only | ~32% (seed 42) |
+| Burgers | Adam 5k + L-BFGS | ~0.5% (seed 42) |
 
-### Day 3 — 2D Heat Equation
-- Extended to `[x, y, t]` input — 3D input space
-- Enforces zero BC on all 4 walls simultaneously
-- Captures spatial decay in both dimensions
-- Relative L2 error vs analytical solution: **TODO — run `day3_2d_heat_pinn.py` and paste the numbers**
+The exact solutions are the analytical solution for the heat equations and the Cole-Hopf solution for Burgers (`utils/burgers_reference.py`).
 
-### Day 4 — Burgers' Equation
-- Nonlinear PDE — the `u ∂u/∂x` term creates a **shock wave** near x=0
-- This is the exact benchmark from the original PINN paper (Raissi et al. 2019)
-- Scored against the exact Cole-Hopf solution (`utils/burgers_reference.py`), compared with the same network trained on IC/BC data only (no physics)
-- Relative L2 error: **TODO — run `day4_burgers_pinn.py` and paste the numbers** (PINN vs no-physics baseline)
+![burgers](outputs/burgers_result.png)
 
----
+### L-BFGS fine-tuning (Burgers)
 
-## Setup
+Adam alone stalls at about 32% error. Switching to L-BFGS on a fixed set of collocation points brought it down to about 0.5% on seed 42.
+
+| Seed | Adam only | Adam + L-BFGS |
+|---|---|---|
+| 42 | TODO | TODO |
+| 1 | TODO | TODO |
+| 2 | TODO | TODO |
+
+I also tried putting half the collocation points near the shock (`--refine`). In my run this made things worse (3.36% vs about 0.5%, seed 42). I only ran it once, so I can't say why.
+
+### FNO vs PINO (Burgers, periodic, nu = 0.01)
+
+Both models learn the map from an initial condition u(x,0) to the solution u(x,1), trained on 1000 random initial conditions with solver data from a pseudo-spectral solver (`FNO_dataset.py`). The PINO adds the PDE residual as an extra loss, using all 1000 initial conditions without needing labels. I varied how many of them have labels.
+
+| Labeled samples | FNO | PINO (weight 0.1, filtered) |
+|---|---|---|
+| 1000 | 4.38% | TODO |
+| 50 | 49.84%, 49.87%, 53.72% (3 seeds) | TODO seed 0, 36.99%, 37.57% |
+
+The physics loss helps a lot when labels are scarce. The first PINO version (no filtering, weight 0.01) was worse than the plain FNO with all 1000 labels (7.54% vs 4.38%).
+
+## What I learned and what went wrong
+
+- **Boundary sampler bug.** In the 2D heat script, boundary points were sampled three times per epoch with mismatched times. I fixed it to sample once.
+- **The shock is hard.** In Burgers the error concentrates in a thin line at x=0 and grows with time (3.6% at t=0.25, 11.4% at t=1.0).
+- **No-physics baseline.** The same network trained only on initial and boundary data fits them (loss 0.001) but has 48.6% error inside the domain, which is the point of adding the PDE loss.
+- **PINO needed a filter.** My guess is that the spectral derivative amplifies high-frequency noise in the network output (by up to about k^2). Filtering with the same 2/3 rule the solver uses brought the 50-label error down further. I didn't prove that this is the cause.
+- **FNO viscosity.** My first dataset used nu = 0.1, but everything had decayed to nearly zero by t=1, which made the problem trivial. I switched to nu = 0.01.
+
+## Limitations
+
+- Seeds: 3 seeds for the FNO/PINO experiments and L-BFGS, 1 for everything else. These are small samples.
+- I picked the PINO weight (0.1) by looking at test error, so that number is slightly optimistic.
+- PINO is slower per epoch than the FNO because of the extra forward passes for the time derivative.
+- Even with the physics loss, the PINO residual stays around 1, so it doesn't fully satisfy the PDE.
+
+## Running it
 
 ```bash
-git clone https://github.com/AnaaOps/PINN-Project
-cd PINN-Project
 pip install -r requirements.txt
+python 1d_heat_pinn.py
+python 2d_heat_pinn.py
+python burgers_pinn.py
+python lbfgs_finetune.py --seed 42
+python FNO_dataset.py
+python FNO_train.py --n-labeled 50
+python FNO_train.py --n-labeled 50 --physics-weight 0.1 --dealias
 ```
 
-Run any file directly:
+Results are saved to `outputs/` (FNO/PINO runs also append to `outputs/fno_results.csv`).
 
-```bash
-python day2_1d_heat_pinn.py   # ~2 min on CPU
-python day3_2d_heat_pinn.py   # ~5 min on CPU
-python day4_burgers_pinn.py   # ~6 min on CPU
-```
-
-Or use the Colab notebooks in `notebooks/` — GPU recommended for Day 3+.
-
----
-
-## File structure
+## Files
 
 ```
-PINN-Project/
-├── day1_autograd_basics.py      # core mechanic: grad of output w.r.t. input
-├── day2_1d_heat_pinn.py         # 1D heat equation PINN, validated vs exact solution
-├── day3_2d_heat_pinn.py         # 2D heat equation PINN, Laplacian in 2 dimensions
-├── day4_burgers_pinn.py         # Burgers equation, nonlinear, shock formation
-├── utils/
-│   └── burgers_reference.py     # exact Burgers solution (Cole-Hopf), used to score day4
-├── notebooks/                   # 01-04, step-by-step Colab versions of each day
-├── outputs/                     # saved plots from each run
-├── requirements.txt
-└── README.md
+autograd_basics.py   gradients of network outputs w.r.t. inputs
+1d_heat_pinn.py      1D heat equation PINN
+2d_heat_pinn.py      2D heat equation PINN
+burgers_pinn.py      Burgers PINN + no-physics baseline
+lbfgs_finetune.py    Adam -> L-BFGS for Burgers
+FNO_dataset.py       spectral solver + dataset for the FNO
+FNO_train.py         FNO and PINO training
+utils/               exact Burgers solution (Cole-Hopf)
+outputs/             plots and fno_results.csv
 ```
 
----
+## Tools
 
-## Key concepts for interviews
-
-| Concept | One line |
-|---|---|
-| Why `requires_grad=True` on input? | Need ∂u/∂x and ∂u/∂t — gradients of output w.r.t. input, not just weights |
-| Why `create_graph=True`? | Keeps graph alive for second differentiation (∂²u/∂x²) |
-| Why Tanh not ReLU? | ReLU's 2nd derivative is 0 — breaks the physics loss completely |
-| Why IC/BC weighted 10×? | PDE has infinite solutions; IC/BC pick the physically correct one |
-| What is a collocation point? | Random interior point where PDE residual is evaluated each epoch |
-| Why Burgers is harder? | Nonlinear `u ∂u/∂x` term creates shocks — standard NNs can't reproduce them |
-
----
-
-## Stack
-
-Python · PyTorch · NumPy · Matplotlib
-
-Concepts: autograd, PDE residuals, collocation sampling, scientific computing, numerical methods
+I used Claude (an AI assistant) to help write and debug code. I ran every experiment myself, and all numbers above come from my own runs.
