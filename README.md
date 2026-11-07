@@ -12,7 +12,7 @@ The project has three parts:
 
 | Problem | Method | Relative L2 error vs exact |
 |---|---|---|
-| 1D heat | PINN | TODO (paste exact value from `1d_heat_pinn.py`) |
+| 1D heat | PINN | 0.616% (max abs error 0.0091) |
 | 2D heat | PINN | 0.90% at t=0, 1.12% at t=1 (8000 epochs) |
 | Burgers | PINN, Adam 10k epochs | 5.70% (max abs error 0.605) |
 | Burgers | Same network, no physics (IC/BC data only) | 48.63% |
@@ -30,8 +30,11 @@ Adam alone stalls at about 32% error. Switching to L-BFGS on a fixed set of coll
 | Seed | Adam only | Adam + L-BFGS |
 |---|---|---|
 | 42 | 32.23% | 0.49% |
-| 1 | TODO | TODO |
-| 2 | TODO | TODO |
+| 1 | 32.39% | 0.41% |
+| 2 | 25.74% | 0.42% |
+| Mean | 30.1% | 0.44% (range 0.41% to 0.49%) |
+
+The result is stable across the three seeds.
 
 I also tried putting half the collocation points near the shock (`--refine`). In my run this made things worse (3.36% vs 0.49%, seed 42). I only ran it once, so I can't say why.
 
@@ -90,3 +93,4 @@ FNO_train.py         FNO and PINO training
 utils/               exact Burgers solution (Cole-Hopf)
 outputs/             plots and fno_results.csv
 ```
+
