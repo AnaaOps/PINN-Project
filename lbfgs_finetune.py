@@ -3,8 +3,8 @@
 (+ optional extra collocation points near the shock)
 
 usage:
-    python day5_lbfgs_finetune.py              # Adam then L-BFGS, uniform points
-    python day5_lbfgs_finetune.py --refine     # same, but half the points near x=0
+    python burgers_lbfgs_finetune.py              # Adam then L-BFGS, uniform points
+    python burgers_lbfgs_finetune.py --refine     # same, but half the points near x=0
 
 prints the relative L2 error vs the exact Cole-Hopf solution after each stage,
 so the effect of each technique is measured separately.
@@ -158,6 +158,6 @@ for ax, U, name in [(axes[1], U_adam, 'Adam'), (axes[2], U_lb, 'Adam + L-BFGS')]
     ax.set_title(f'|error| - {name}'); ax.set_xlabel('t'); ax.set_ylabel('x')
 plt.suptitle(f'Burgers PINN: L-BFGS fine-tuning ({TAG} collocation points)')
 plt.tight_layout()
-out = f'outputs/day5_lbfgs_{TAG}.png'
+out = f'outputs/burgers_lbfgs_{TAG}.png'
 plt.savefig(out, dpi=150, bbox_inches='tight')
 print('plot saved to', out)
