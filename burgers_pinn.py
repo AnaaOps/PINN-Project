@@ -230,5 +230,5 @@ ax.set_xlabel("epoch"); ax.set_ylabel("loss (log)"); ax.set_title("Training loss
 ax.grid(alpha=0.3)
 
 plt.tight_layout()
-plt.savefig("outputs/day4_result.png", dpi=150, bbox_inches='tight')
-print("\nplot saved to outputs/day4_result.png")
+plt.savefig("outputs/burgers_result.png", dpi=150, bbox_inches='tight')
+print("\nplot saved to outputs/burgers_result.png")
