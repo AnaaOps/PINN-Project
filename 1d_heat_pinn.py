@@ -196,8 +196,8 @@ ax.set_xlabel("x"); ax.set_ylabel("u at t=1"); ax.set_title("t=1.0 comparison")
 ax.legend(fontsize=8); ax.grid(alpha=0.3)
 
 plt.tight_layout()
-plt.savefig("outputs/day2_result.png", dpi=150, bbox_inches='tight')
-print("plot saved to outputs/day2_result.png")
+plt.savefig("outputs/heat_1d_result.png", dpi=150, bbox_inches='tight')
+print("plot saved to outputs/heat_1d_result.png")
 
 rel_err = np.linalg.norm(uf - u_ex) / np.linalg.norm(u_ex)
 print(f"\nrelative L2 error : {rel_err*100:.3f}%")
